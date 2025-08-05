@@ -148,9 +148,6 @@ router.get("/:id", auth, async (req, res) => {
 // @route   PUT api/players/:id
 // @desc    Update a player profile
 // @access  Private (owner only)
-// @route   PUT api/players/:id
-// @desc    Update a player profile
-// @access  Private (owner only)
 router.put(
   "/:id",
   auth,
@@ -173,7 +170,7 @@ router.put(
         return res.status(400).json({ msg: "Player data is required" });
       }
 
-      // Build updateData object, only including fields that are provided
+      // Build updateData object, only including fields that are provided and non-empty for certain fields
       const updateData = {};
       if (playerData.name !== undefined) updateData.name = playerData.name;
       if (playerData.position !== undefined) updateData.position = playerData.position;
@@ -186,8 +183,8 @@ router.put(
       if (playerData.isAvailable !== undefined) updateData.isAvailable = playerData.isAvailable;
       if (playerData.price !== undefined) updateData.price = playerData.price;
       if (playerData.currency !== undefined) updateData.currency = playerData.currency;
-      if (playerData.photoUrl !== undefined) updateData.photo = playerData.photoUrl;
-      if (playerData.screenshotUrl !== undefined) updateData.screenshot = playerData.screenshotUrl;
+      if (playerData.photoUrl !== undefined && playerData.photoUrl !== '') updateData.photo = playerData.photoUrl;
+      if (playerData.screenshotUrl !== undefined && playerData.screenshotUrl !== '') updateData.screenshot = playerData.screenshotUrl;
 
       // Only update if there are fields to update
       if (Object.keys(updateData).length === 0) {
@@ -208,7 +205,7 @@ router.put(
       res.status(500).json({ msg: "Server Error" });
     }
   }
-)
+);
 // @route   DELETE api/players/:id
 // @desc    Delete a player profile
 // @access  Private (owner only)
