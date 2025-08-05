@@ -148,56 +148,67 @@ router.get("/:id", auth, async (req, res) => {
 // @route   PUT api/players/:id
 // @desc    Update a player profile
 // @access  Private (owner only)
-router.put("/:id", auth, async (req, res) => {
-  try {
-    if (!Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ msg: "Invalid player ID" })
-    }
-    let player = await Player.findById(req.params.id)
-    if (!player) {
-      return res.status(404).json({ msg: "Player not found" })
-    }
-    if (player.owner.toString() !== req.user.id && !req.user.isAdmin) {
-      return res.status(401).json({ msg: "User not authorized" })
-    }
+// @route   PUT api/players/:id
+// @desc    Update a player profile
+// @access  Private (owner only)
+router.put(
+  "/:id",
+  auth,
+  async (req, res) => {
+    try {
+      if (!Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ msg: "Invalid player ID" });
+      }
+      let player = await Player.findById(req.params.id);
+      if (!player) {
+        return res.status(404).json({ msg: "Player not found" });
+      }
+      if (player.owner.toString() !== req.user.id && !req.user.isAdmin) {
+        return res.status(401).json({ msg: "User not authorized" });
+      }
 
-    const { playerData } = req.body
-    console.log("Received player data:", playerData)
-    if (!playerData) {
-      return res.status(400).json({ msg: "Player data is required" })
-    }
+      const { playerData } = req.body;
+      console.log('Received player data:', playerData);
+      if (!playerData) {
+        return res.status(400).json({ msg: "Player data is required" });
+      }
 
-    const updateData = {
-      name: playerData.name,
-      position: playerData.position,
-      rating: Number(playerData.rating),
-      badges: playerData.badges,
-      console: playerData.console,
-      timezone: playerData.timezone,
-      attributes: playerData.attributes,
-      bio: playerData.bio,
-      isAvailable: playerData.isAvailable,
-      price: playerData.price,
-      currency: playerData.currency,
-      photo: playerData.photoUrl,
-      screenshot: playerData.screenshotUrl,
-    }
+      // Build updateData object, only including fields that are provided
+      const updateData = {};
+      if (playerData.name !== undefined) updateData.name = playerData.name;
+      if (playerData.position !== undefined) updateData.position = playerData.position;
+      if (playerData.rating !== undefined) updateData.rating = Number(playerData.rating);
+      if (playerData.badges !== undefined) updateData.badges = playerData.badges;
+      if (playerData.console !== undefined) updateData.console = playerData.console;
+      if (playerData.timezone !== undefined) updateData.timezone = playerData.timezone;
+      if (playerData.attributes !== undefined) updateData.attributes = playerData.attributes;
+      if (playerData.bio !== undefined) updateData.bio = playerData.bio;
+      if (playerData.isAvailable !== undefined) updateData.isAvailable = playerData.isAvailable;
+      if (playerData.price !== undefined) updateData.price = playerData.price;
+      if (playerData.currency !== undefined) updateData.currency = playerData.currency;
+      if (playerData.photoUrl !== undefined) updateData.photo = playerData.photoUrl;
+      if (playerData.screenshotUrl !== undefined) updateData.screenshot = playerData.screenshotUrl;
 
-    player = await Player.findByIdAndUpdate(
-      req.params.id,
-      { $set: updateData },
-      { new: true, runValidators: true },
-    ).populate("owner", "username joinDate totalPlayers isOnline lastSeen")
-    res.json(player)
-  } catch (err) {
-    console.error(err.message)
-    if (err.kind === "ObjectId") {
-      return res.status(400).json({ msg: "Invalid player ID" })
+      // Only update if there are fields to update
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ msg: "No valid fields provided for update" });
+      }
+
+      player = await Player.findByIdAndUpdate(
+        req.params.id,
+        { $set: updateData },
+        { new: true, runValidators: true }
+      ).populate("owner", "username joinDate totalPlayers isOnline lastSeen");
+      res.json(player);
+    } catch (err) {
+      console.error(err.message);
+      if (err.kind === "ObjectId") {
+        return res.status(400).json({ msg: "Invalid player ID" });
+      }
+      res.status(500).json({ msg: "Server Error" });
     }
-    res.status(500).json({ msg: "Server Error" })
   }
-})
-
+)
 // @route   DELETE api/players/:id
 // @desc    Delete a player profile
 // @access  Private (owner only)
