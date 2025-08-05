@@ -8,26 +8,28 @@ dotenv.config()
 
 const createAdmin = async () => {
   try {
-    // Connect to MongoDB
-    const MONGO_URI = "mongodb+srv://i220821:P3dnajod2MYo4oJ0@testingdatabase.9qxvuhb.mongodb.net/"
+    // Connect to MongoDB using environment variable
+    const MONGO_URI = process.env.MONGO_URI
+
+    if (!MONGO_URI) {
+      console.error("MONGO_URI environment variable is not set")
+      process.exit(1)
+    }
 
     await mongoose.connect(MONGO_URI)
     console.log("MongoDB Connected...")
 
-    // Admin user details
+    // Admin user details - use environment variables for production
     const adminData = {
-      username: "admin",
-      email: "admin@gmail.com",
-      password: "admin", // This will be hashed
-      isAdmin: true
+      username: process.env.ADMIN_USERNAME || "admin",
+      email: process.env.ADMIN_EMAIL || "admin@gmail.com",
+      password: process.env.ADMIN_PASSWORD || "admin123", // Use a stronger default
+      isAdmin: true,
     }
 
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ 
-      $or: [
-        { email: adminData.email },
-        { username: adminData.username }
-      ]
+    const existingAdmin = await User.findOne({
+      $or: [{ email: adminData.email }, { username: adminData.username }],
     })
 
     if (existingAdmin) {
@@ -44,8 +46,9 @@ const createAdmin = async () => {
     await admin.save()
 
     console.log("Admin user created successfully!")
+    console.log("Username:", adminData.username)
     console.log("Email:", adminData.email)
-    console.log("Password:", adminData.password)  // Show the unhashed password
+    console.log("Password: [HIDDEN FOR SECURITY]")
     process.exit(0)
   } catch (err) {
     console.error("Error:", err.message)

@@ -11,7 +11,7 @@ import User from "./models/user.js"
 // Load env variables
 dotenv.config()
 if (!process.env.MONGO_URI) {
-  console.error('MONGO_URI is not defined in .env file')
+  console.error("MONGO_URI is not defined in .env file")
   process.exit(1)
 }
 
@@ -23,13 +23,18 @@ import conversationRoutes from "./routes/conversation.js"
 import userRoutes from "./routes/user.js"
 import adminRoutes from "./routes/admin.js"
 
-dotenv.config()
-
 const app = express()
 const httpServer = createServer(app)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,
+  process.env.RENDER_EXTERNAL_URL,
+].filter(Boolean)
+
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === "production" ? "https://your-frontend-domain.com" : "http://localhost:5173",
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   },
@@ -38,7 +43,16 @@ const io = new SocketIOServer(httpServer, {
 // Middleware
 app.use(
   cors({
-    origin: process.env.NODE_ENV === "production" ? "https://your-frontend-domain.com" : "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, etc.)
+      if (!origin) return callback(null, true)
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true)
+      } else {
+        callback(new Error("Not allowed by CORS"))
+      }
+    },
     credentials: true,
   }),
 )
@@ -55,6 +69,17 @@ const connectDB = async () => {
   }
 }
 connectDB()
+
+// Add better error handling and logging
+process.on("unhandledRejection", (err) => {
+  console.log("Unhandled Rejection:", err.message)
+  process.exit(1)
+})
+
+process.on("uncaughtException", (err) => {
+  console.log("Uncaught Exception:", err.message)
+  process.exit(1)
+})
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -174,6 +199,6 @@ app.get("/", (req, res) => {
   res.send("2K Lobby Backend API is running!")
 })
 
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT || 10000
 
 httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`))

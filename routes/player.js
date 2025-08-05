@@ -1,9 +1,8 @@
 import express from "express"
-import multer from "multer"
-import path from "path"
 import { fileURLToPath } from "url"
-import Player from "../models/player.js";
-import {auth} from "../middleware/auth.js"
+import path from "path"
+import Player from "../models/player.js"
+import { auth } from "../middleware/auth.js"
 import User from "../models/user.js"
 import { Types } from "mongoose"
 
@@ -13,81 +12,76 @@ const router = express.Router()
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-
 // @route   POST api/players
 // @desc    Create a new player profile
 // @access  Private
-router.post(
-  "/",
-  auth,
-  async (req, res) => {
-    try {
-      const { playerData } = req.body
-      if (!playerData) {
-        console.error("Player data is required", playerData)
-        return res.status(400).json({ msg: "Player data is required" })
-      }
-      // console1.log("Received player data:", playerData);
-      const {
-        name,
-        position,
-        rating,
-        badges,
-        console1,
-        timezone,
-        attributes,
-        bio,
-        isAvailable,
-        price,
-        currency,
-        photoUrl,
-        screenshotUrl,
-      } = playerData
+router.post("/", auth, async (req, res) => {
+  try {
+    const { playerData } = req.body
+    if (!playerData) {
+      console.error("Player data is required", playerData)
+      return res.status(400).json({ msg: "Player data is required" })
+    }
+    // console1.log("Received player data:", playerData);
+    const {
+      name,
+      position,
+      rating,
+      badges,
+      console1,
+      timezone,
+      attributes,
+      bio,
+      isAvailable,
+      price,
+      currency,
+      photoUrl,
+      screenshotUrl,
+    } = playerData
 
-      // Validate required fields
-      if (!name || !position || !rating || !console1 || !timezone) {
-        console.error("Missing required fields:", { name, position, rating, console1, timezone })
-        return res.status(400).json({ msg: "Missing required fields: name, position, rating, console, timezone" })
-      }
+    // Validate required fields
+    if (!name || !position || !rating || !console1 || !timezone) {
+      console.error("Missing required fields:", { name, position, rating, console1, timezone })
+      return res.status(400).json({ msg: "Missing required fields: name, position, rating, console, timezone" })
+    }
 
     // Create new player instance
-      const newPlayer = new Player({
-        owner: req.user.id,
-        name,
-        position,
-        rating: Number(rating),
-        badges,
-        console: console1,
-        timezone,
-        attributes,
-        bio,
-        isAvailable: isAvailable !== undefined ? isAvailable : true,
-        price,
-        currency,
-        photo: photoUrl ? photoUrl : playerPhotoUrl,
-        screenshot: screenshotUrl ? screenshotUrl : playerScreenshotUrl
-      })
+    const newPlayer = new Player({
+      owner: req.user.id,
+      name,
+      position,
+      rating: Number(rating),
+      badges,
+      console: console1,
+      timezone,
+      attributes,
+      bio,
+      isAvailable: isAvailable !== undefined ? isAvailable : true,
+      price,
+      currency,
+      photo: photoUrl ? photoUrl : "/placeholder.svg?height=100&width=100",
+      screenshot: screenshotUrl ? screenshotUrl : "/placeholder.svg?height=100&width=100",
+    })
 
-      const player = await newPlayer.save()
+    const player = await newPlayer.save()
 
-      // Update user's players array
-      await User.findByIdAndUpdate(req.user.id, {
-        $push: { players: player._id },
-        $inc: { totalPlayers: 1 },
-      })
+    // Update user's players array
+    await User.findByIdAndUpdate(req.user.id, {
+      $push: { players: player._id },
+      $inc: { totalPlayers: 1 },
+    })
 
-      res.status(201).json(player)
-    } catch (err) {
-      console.error(err.message)
-      res.status(500).json({ msg: "Server Error" })
-    }
+    res.status(201).json(player)
+  } catch (err) {
+    console.error(err.message)
+    res.status(500).json({ msg: "Server Error" })
   }
-)
+})
 
 // @route   GET api/players
 // @desc    Get all player profiles (with optional filters/search)
 // @access  Public
-router.get("/",auth, async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
     const { position, console, timezone, minRating, maxRating, status, search, owner } = req.query
     const query = {}
@@ -126,19 +120,19 @@ router.get("/",auth, async (req, res) => {
 // @route   GET api/players/:id
 // @desc    Get a single player profile by ID
 // @access  Public
-router.get("/:id",auth, async (req, res) => {
+router.get("/:id", auth, async (req, res) => {
   try {
     if (!Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ msg: "Invalid player ID" })
     }
     const player = await Player.findById(req.params.id).populate(
       "owner",
-      "username joinDate totalPlayers isOnline lastSeen"
+      "username joinDate totalPlayers isOnline lastSeen",
     )
     if (!player) {
       return res.status(404).json({ msg: "Player not found" })
     }
-     if (!player.owner) {
+    if (!player.owner) {
       return res.status(404).json({ msg: "Player's Owner not found" })
     }
     res.json(player)
@@ -154,59 +148,55 @@ router.get("/:id",auth, async (req, res) => {
 // @route   PUT api/players/:id
 // @desc    Update a player profile
 // @access  Private (owner only)
-router.put(
-  "/:id",
-  auth,
-  async (req, res) => {
-    try {
-      if (!Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ msg: "Invalid player ID" })
-      }
-      let player = await Player.findById(req.params.id)
-      if (!player) {
-        return res.status(404).json({ msg: "Player not found" })
-      }
-      if (player.owner.toString() !== req.user.id) {
-        return res.status(401).json({ msg: "User not authorized" })
-      }
-
-      const { playerData } = req.body;
-      console.log('Received player data:', playerData);
-      if (!playerData) {
-        return res.status(400).json({ msg: "Player data is required" });
-      }
-
-      const updateData = {
-        name: playerData.name,
-        position: playerData.position,
-        rating: Number(playerData.rating),
-        badges: playerData.badges,
-        console: playerData.console,
-        timezone: playerData.timezone,
-        attributes: playerData.attributes,
-        bio: playerData.bio,
-        isAvailable: playerData.isAvailable,
-        price: playerData.price,
-        currency: playerData.currency,
-        photo: playerData.photoUrl,
-        screenshot: playerData.screenshotUrl
-      };
-
-      player = await Player.findByIdAndUpdate(
-        req.params.id,
-        { $set: updateData },
-        { new: true, runValidators: true }
-      ).populate("owner", "username joinDate totalPlayers isOnline lastSeen")
-      res.json(player)
-    } catch (err) {
-      console.error(err.message)
-      if (err.kind === "ObjectId") {
-        return res.status(400).json({ msg: "Invalid player ID" })
-      }
-      res.status(500).json({ msg: "Server Error" })
+router.put("/:id", auth, async (req, res) => {
+  try {
+    if (!Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ msg: "Invalid player ID" })
     }
+    let player = await Player.findById(req.params.id)
+    if (!player) {
+      return res.status(404).json({ msg: "Player not found" })
+    }
+    if (player.owner.toString() !== req.user.id) {
+      return res.status(401).json({ msg: "User not authorized" })
+    }
+
+    const { playerData } = req.body
+    console.log("Received player data:", playerData)
+    if (!playerData) {
+      return res.status(400).json({ msg: "Player data is required" })
+    }
+
+    const updateData = {
+      name: playerData.name,
+      position: playerData.position,
+      rating: Number(playerData.rating),
+      badges: playerData.badges,
+      console: playerData.console,
+      timezone: playerData.timezone,
+      attributes: playerData.attributes,
+      bio: playerData.bio,
+      isAvailable: playerData.isAvailable,
+      price: playerData.price,
+      currency: playerData.currency,
+      photo: playerData.photoUrl,
+      screenshot: playerData.screenshotUrl,
+    }
+
+    player = await Player.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    ).populate("owner", "username joinDate totalPlayers isOnline lastSeen")
+    res.json(player)
+  } catch (err) {
+    console.error(err.message)
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ msg: "Invalid player ID" })
+    }
+    res.status(500).json({ msg: "Server Error" })
   }
-)
+})
 
 // @route   DELETE api/players/:id
 // @desc    Delete a player profile

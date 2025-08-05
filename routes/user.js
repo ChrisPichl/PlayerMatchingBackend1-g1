@@ -1,6 +1,7 @@
 import express from "express"
-import User from "../models/user.js";
-import {auth} from "../middleware/auth.js"
+import User from "../models/user.js"
+import { auth } from "../middleware/auth.js"
+import { Types } from "mongoose"
 
 const router = express.Router()
 
@@ -24,7 +25,17 @@ router.get("/me", auth, async (req, res) => {
 // @desc    Update authenticated user profile
 // @access  Private
 router.put("/me", auth, async (req, res) => {
-  const { username, email, preferredConsole, timezone, bio, isOnline, profileVisibility, showOnlineStatus, allowInvites } = req.body
+  const {
+    username,
+    email,
+    preferredConsole,
+    timezone,
+    bio,
+    isOnline,
+    profileVisibility,
+    showOnlineStatus,
+    allowInvites,
+  } = req.body
 
   // Build user fields object
   const userFields = {}
@@ -65,7 +76,7 @@ router.put("/me", auth, async (req, res) => {
     user = await User.findByIdAndUpdate(
       req.user.id,
       { $set: userFields },
-      { new: true, runValidators: true, select: "-password" }
+      { new: true, runValidators: true, select: "-password" },
     )
 
     res.json(user)
@@ -86,7 +97,9 @@ router.get("/:id", async (req, res) => {
     if (!Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ msg: "Invalid user ID" })
     }
-    const user = await User.findById(req.params.id).select("username joinDate totalPlayers isOnline lastSeen avatar profileVisibility showOnlineStatus allowInvites")
+    const user = await User.findById(req.params.id).select(
+      "username joinDate totalPlayers isOnline lastSeen avatar profileVisibility showOnlineStatus allowInvites",
+    )
     if (!user) {
       return res.status(404).json({ msg: "User not found" })
     }
