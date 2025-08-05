@@ -14,10 +14,31 @@ Set these environment variables in your Render dashboard:
 - `JWT_SECRET` - A secure random string for JWT tokens (generate with: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`)
 
 ### Optional
-- `FRONTEND_URL` - Your frontend URL (for CORS)
+- `FRONTEND_URL` - Your frontend URL (currently: http://localhost:5000, later: your deployed frontend URL)
 - `ADMIN_USERNAME` - Admin username (default: admin)
 - `ADMIN_EMAIL` - Admin email (default: admin@gmail.com)
 - `ADMIN_PASSWORD` - Admin password (default: admin123)
+- `NETLIFY_URL` - If deploying frontend to Netlify
+- `VERCEL_URL` - If deploying frontend to Vercel
+
+## Local Development Setup
+
+For local development with your frontend on localhost:5000:
+
+1. **Environment Variables** (create `.env` file):
+   \`\`\`
+   MONGO_URI=your_mongodb_connection_string
+   JWT_SECRET=your_jwt_secret
+   FRONTEND_URL=http://localhost:5000
+   NODE_ENV=development
+   \`\`\`
+
+2. **Start the server**:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
+
+Your backend will run on port 10000 (or PORT env variable) and accept requests from localhost:5000.
 
 ## Deployment Steps
 

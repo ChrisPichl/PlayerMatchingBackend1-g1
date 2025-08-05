@@ -8,10 +8,16 @@ import Message from "./models/message.js"
 import Conversation from "./models/conversation.js"
 import User from "./models/user.js"
 
-// Load env variables
+// Load env variables first
 dotenv.config()
-if (!process.env.MONGO_URI) {
-  console.error("MONGO_URI is not defined in .env file")
+
+// Validate required environment variables
+const requiredEnvVars = ["MONGO_URI", "JWT_SECRET"]
+const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar])
+
+if (missingEnvVars.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missingEnvVars.join(", ")}`)
+  console.error("Please set these variables in your Render dashboard")
   process.exit(1)
 }
 
@@ -25,12 +31,21 @@ import adminRoutes from "./routes/admin.js"
 
 const app = express()
 const httpServer = createServer(app)
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  process.env.FRONTEND_URL,
-  process.env.RENDER_EXTERNAL_URL,
-].filter(Boolean)
+
+// CORS configuration - automatically handles localhost and deployed URLs
+const getAllowedOrigins = () => {
+  const origins = ["http://localhost:3000", "http://localhost:5000", "http://localhost:5173", "https://localhost:5000"]
+
+  // Add environment-specific origins
+  if (process.env.FRONTEND_URL) origins.push(process.env.FRONTEND_URL)
+  if (process.env.RENDER_EXTERNAL_URL) origins.push(process.env.RENDER_EXTERNAL_URL)
+  if (process.env.NETLIFY_URL) origins.push(process.env.NETLIFY_URL)
+  if (process.env.VERCEL_URL) origins.push(`https://${process.env.VERCEL_URL}`)
+
+  return origins.filter(Boolean)
+}
+
+const allowedOrigins = getAllowedOrigins()
 
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -44,73 +59,81 @@ const io = new SocketIOServer(httpServer, {
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, etc.)
+      // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true)
 
-      if (allowedOrigins.indexOf(origin) !== -1) {
+      if (allowedOrigins.includes(origin)) {
         callback(null, true)
       } else {
+        console.log(`🚫 CORS blocked origin: ${origin}`)
         callback(new Error("Not allowed by CORS"))
       }
     },
     credentials: true,
   }),
 )
-app.use(express.json())
+
+app.use(express.json({ limit: "10mb" }))
+app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI)
-    console.log("MongoDB Connected...")
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`)
   } catch (err) {
-    console.error("MongoDB connection error:", err.message)
+    console.error("❌ MongoDB connection error:", err.message)
     process.exit(1)
   }
 }
+
+// Initialize database connection
 connectDB()
 
-// Add better error handling and logging
+// Graceful error handling
 process.on("unhandledRejection", (err) => {
-  console.log("Unhandled Rejection:", err.message)
-  process.exit(1)
+  console.log("❌ Unhandled Rejection:", err.message)
+  httpServer.close(() => {
+    process.exit(1)
+  })
 })
 
 process.on("uncaughtException", (err) => {
-  console.log("Uncaught Exception:", err.message)
+  console.log("❌ Uncaught Exception:", err.message)
   process.exit(1)
 })
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id)
+  console.log("👤 User connected:", socket.id)
 
-  // Join a conversation room
   socket.on("joinRoom", (conversationId) => {
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      console.error(`Invalid conversationId: ${conversationId}`)
+      console.error(`❌ Invalid conversationId: ${conversationId}`)
       return
     }
     socket.join(conversationId)
-    console.log(`User ${socket.id} joined room ${conversationId}`)
+    console.log(`🏠 User ${socket.id} joined room ${conversationId}`)
   })
 
-  // Handle new messages
   socket.on("sendMessage", async ({ conversationId, senderId, content }) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(conversationId) || !mongoose.Types.ObjectId.isValid(senderId)) {
-        console.error(`Invalid conversationId or senderId: ${conversationId}, ${senderId}`)
+        console.error(`❌ Invalid IDs: ${conversationId}, ${senderId}`)
         return
       }
 
       const conversation = await Conversation.findById(conversationId)
       if (!conversation) {
-        console.error(`Conversation not found: ${conversationId}`)
+        console.error(`❌ Conversation not found: ${conversationId}`)
         return
       }
 
       if (!conversation.participants.includes(senderId)) {
-        console.error(`User ${senderId} not authorized for conversation ${conversationId}`)
+        console.error(`❌ User ${senderId} not authorized for conversation ${conversationId}`)
         return
       }
 
@@ -121,13 +144,10 @@ io.on("connection", (socket) => {
       })
 
       const savedMessage = await newMessage.save()
-
-      // Update conversation's lastMessage and updatedAt
       conversation.lastMessage = savedMessage._id
       conversation.updatedAt = new Date()
       await conversation.save()
 
-      // Populate sender details for emission
       const populatedMessage = await Message.findById(savedMessage._id).populate("sender", "username avatar")
 
       io.to(conversationId).emit("receiveMessage", {
@@ -142,48 +162,56 @@ io.on("connection", (socket) => {
         timestamp: populatedMessage.timestamp,
       })
 
-      console.log(`Message in room ${conversationId} from ${senderId}: ${content}`)
+      console.log(`💬 Message sent in room ${conversationId}`)
     } catch (err) {
-      console.error("Error saving message:", err.message)
+      console.error("❌ Error saving message:", err.message)
     }
   })
 
-  // Handle user online status
   socket.on("goOnline", async (userId) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-        console.error(`Invalid userId: ${userId}`)
+        console.error(`❌ Invalid userId: ${userId}`)
         return
       }
       await User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: null })
-      console.log(`User ${userId} is online`)
+      console.log(`🟢 User ${userId} is online`)
       io.emit("userStatusUpdate", { userId, isOnline: true })
     } catch (err) {
-      console.error("Error updating online status:", err.message)
+      console.error("❌ Error updating online status:", err.message)
     }
   })
 
-  // Handle user offline status
   socket.on("goOffline", async (userId) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-        console.error(`Invalid userId: ${userId}`)
+        console.error(`❌ Invalid userId: ${userId}`)
         return
       }
       await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() })
-      console.log(`User ${userId} is offline`)
+      console.log(`🔴 User ${userId} is offline`)
       io.emit("userStatusUpdate", { userId, isOnline: false })
     } catch (err) {
-      console.error("Error updating offline status:", err.message)
+      console.error("❌ Error updating offline status:", err.message)
     }
   })
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id)
+    console.log("👋 User disconnected:", socket.id)
   })
 })
 
-// Define API routes
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+  })
+})
+
+// API routes
 app.use("/api/auth", authRoutes)
 app.use("/api/players", playerRoutes)
 app.use("/api/messages", messageRoutes)
@@ -191,14 +219,41 @@ app.use("/api/conversations", conversationRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/admin", adminRoutes)
 
-// Serve uploaded files (for player photos/screenshots)
-app.use("/uploads", express.static("Uploads"))
+// Serve uploaded files
+app.use("/uploads", express.static("uploads"))
 
-// Basic route for testing
+// Root endpoint
 app.get("/", (req, res) => {
-  res.send("2K Lobby Backend API is running!")
+  res.json({
+    message: "🏀 2K Lobby Backend API is running!",
+    version: "1.0.0",
+    endpoints: {
+      health: "/health",
+      auth: "/api/auth",
+      players: "/api/players",
+      users: "/api/users",
+      messages: "/api/messages",
+      conversations: "/api/conversations",
+      admin: "/api/admin",
+    },
+  })
+})
+
+// 404 handler
+app.use("*", (req, res) => {
+  res.status(404).json({ message: "Route not found" })
+})
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("❌ Server Error:", err.stack)
+  res.status(500).json({ message: "Something went wrong!" })
 })
 
 const PORT = process.env.PORT || 10000
 
-httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`)
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`)
+  console.log(`🔗 Allowed origins: ${allowedOrigins.join(", ")}`)
+})

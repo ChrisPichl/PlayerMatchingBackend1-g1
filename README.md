@@ -1,30 +1,113 @@
-# backend
+# 🏀 2K Lobby Backend
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+NBA 2K Player Matching Backend API with real-time messaging.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/chris-projects-55386f8e/v0-backend-0r)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/nr4kwgyc08d)
+## 🚀 Quick Deploy to Render
 
-## Overview
+### 1. Push to GitHub
+\`\`\`bash
+git add .
+git commit -m "Initial commit"
+git push origin main
+\`\`\`
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+### 2. Deploy on Render
+1. Go to [Render Dashboard](https://dashboard.render.com/)
+2. Click "New +" → "Web Service"
+3. Connect your GitHub repository
+4. Render will auto-detect settings from `render.yaml`
 
-## Deployment
+### 3. Set Environment Variables
+In your Render service settings, add these environment variables:
 
-Your project is live at:
+#### Required ✅
+\`\`\`
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+JWT_SECRET=your-super-secret-jwt-key-here
+\`\`\`
 
-**[https://vercel.com/chris-projects-55386f8e/v0-backend-0r](https://vercel.com/chris-projects-55386f8e/v0-backend-0r)**
+#### Optional 🔧
+\`\`\`
+FRONTEND_URL=http://localhost:5000
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=securepassword123
+\`\`\`
 
-## Build your app
+### 4. Deploy! 🎉
+Render will automatically build and deploy your app.
 
-Continue building your app on:
+## 🔧 Local Development
 
-**[https://v0.dev/chat/projects/nr4kwgyc08d](https://v0.dev/chat/projects/nr4kwgyc08d)**
+\`\`\`bash
+# Install dependencies
+npm install
 
-## How It Works
+# Create .env file with your variables
+cp .env.example .env
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+# Start development server
+npm run dev
+\`\`\`
+
+## 📡 API Endpoints
+
+- `GET /` - API info
+- `GET /health` - Health check
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/players` - Get all players
+- `POST /api/players` - Create player profile
+- `GET /api/conversations` - Get user conversations
+- `POST /api/messages` - Send message
+
+## 🌐 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `MONGO_URI` | MongoDB connection string | ✅ |
+| `JWT_SECRET` | JWT signing secret | ✅ |
+| `PORT` | Server port (auto-set by Render) | ❌ |
+| `FRONTEND_URL` | Frontend URL for CORS | ❌ |
+| `NODE_ENV` | Environment (auto-set to production) | ❌ |
+
+## 🔐 Generate JWT Secret
+
+\`\`\`bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+\`\`\`
+
+## 📱 Features
+
+- ✅ User authentication & authorization
+- ✅ Player profile management
+- ✅ Real-time messaging (Socket.IO)
+- ✅ Admin panel
+- ✅ File upload support
+- ✅ Advanced filtering & search
+- ✅ CORS configured for multiple origins
+- ✅ Production-ready error handling
+
+## 🛠️ Tech Stack
+
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Database**: MongoDB with Mongoose
+- **Authentication**: JWT
+- **Real-time**: Socket.IO
+- **Deployment**: Render
+
+## 📞 Support
+
+If you encounter any issues during deployment, check:
+1. Environment variables are set correctly
+2. MongoDB connection string is valid
+3. JWT secret is generated and set
+4. Check Render logs for detailed error messages
+
+---
+
+**Ready to deploy? Just push to GitHub and connect to Render!** 🚀
+\`\`\`
+
+Create an example environment file:
